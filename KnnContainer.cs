@@ -59,7 +59,7 @@ namespace KNN {
 		internal DisposeSentinel m_DisposeSentinel;
 #endif
 
-		const int c_maxPointsPerLeafNode = 256;
+		const int c_maxPointsPerLeafNode = 128;
 
 		public struct KnnQueryTemp {
 			public KSmallestHeap Heap;
@@ -460,7 +460,9 @@ namespace KNN {
 
 		internal void KNearest(float3 queryPosition, NativeSlice<int> result, KnnQueryTemp temp) {
 			int k = result.Length;
-
+			temp.QueueList.Clear();
+			temp.Heap.Clear();
+			
 			var points = Points;
 			var permutation = m_permutation;
 			var rootNode = RootNode;
@@ -471,7 +473,7 @@ namespace KNN {
 			float bssr = float.PositiveInfinity;
 			float3 rootClosestPoint = rootNode.Bounds.ClosestPoint(queryPosition);
 			PushToHeap(rootNode, rootClosestPoint, queryPosition, ref temp);
-
+			
 			// searching
 			while (temp.MinHeap.Count > 0) {
 				KdQueryNode queryNode = temp.MinHeap.PopObj();
