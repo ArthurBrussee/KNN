@@ -5,7 +5,6 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
-// Jobs for querying
 namespace KNN.Jobs {
 	[BurstCompile(CompileSynchronously = true)]
 	public struct KnnQueryJob : IJob {
@@ -29,7 +28,7 @@ namespace KNN.Jobs {
 	public struct KNearestBatchQueryJob : IJobParallelForBatch {
 		[ReadOnly] KnnContainer m_container;
 
-		[ReadOnly] 
+		[ReadOnly]
 		NativeSlice<float3> m_queryPositions;
 
 		// Unity really doesn't like it when we write to the same underlying array
@@ -44,18 +43,18 @@ namespace KNN.Jobs {
 			m_queryPositions = queryPositions;
 			m_results = results;
 
-		#if ENABLE_UNITY_COLLECTIONS_CHECKS
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
 			if (queryPositions.Length == 0 || results.Length % queryPositions.Length != 0) {
 				Debug.LogError("Make sure your results array is a multiple in length of your querypositions array!");
 			}
-		#endif
+#endif
 
 			m_k = results.Length / queryPositions.Length;
 		}
-		
+
 		public void Execute(int startIndex, int count) {
 			var temp = KnnContainer.KnnQueryTemp.Create(m_k);
-			
+
 			// Write results to proper slice!
 			for (int index = startIndex; index < startIndex + count; ++index) {
 				var resultsSlice = m_results.Slice(index * m_k, m_k);

@@ -25,14 +25,9 @@
 using System;
 using System.Diagnostics;
 using KNN.Internal;
-using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Jobs;
 using Unity.Mathematics;
-using Debug = UnityEngine.Debug;
-
-
 
 namespace KNN {
 	[NativeContainerSupportsDeallocateOnJobCompletion, NativeContainer, DebuggerDisplay("Length = {Points.Length}")]
