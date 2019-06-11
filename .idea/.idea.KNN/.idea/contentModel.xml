@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="C:\Users\A-Bru\.Rider2019.1\config\extensions" t="IncludeRecursive" />
+    <e p="C:\Users\A-Bru\.Rider2019.1\system\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\A-Bru\.Rider2019.1\system\resharper-host\local\Transient\ReSharperHost\v191\SolutionCaches\_KNN.-1675154068.00" t="ExcludeRecursive" />
+    <e p="C:\Users\A-Bru\Documents\Projects\KNN" t="IncludeRecursive">
+      <e p="KNN" t="Include">
+        <e p="Demo" t="Include">
+          <e p="KnnApiDemo.cs" t="Include" />
+          <e p="KnnVisualizationDemo.cs" t="Include" />
+          <e p="QueryProbe.cs" t="Include" />
+        </e>
+        <e p="KDBounds.cs" t="Include" />
+        <e p="KDNode.cs" t="Include" />
+        <e p="KDQueryNode.cs" t="Include" />
+        <e p="KNN.asmdef" t="Include" />
+        <e p="KnnContainer.cs" t="Include" />
+        <e p="KnnQueryCache.cs" t="Include" />
+        <e p="KSmallest.cs" t="Include" />
+        <e p="MinHeap.cs" t="Include" />
+      </e>
+      <e p="KNN.csproj" t="IncludeRecursive" />
+      <e p="KNN.sln" t="IncludeFlat" />
+      <e p="obj" t="ExcludeRecursive" />
+      <e p="Packages" t="ExcludeRecursive" />
+      <e p="Temp\bin" t="ExcludeRecursive" />
+    </e>
+  </component>
+</project>
