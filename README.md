@@ -6,7 +6,7 @@ Simple K-Nearest Neighbour library for Unity, using the 'Dots' technology stack 
 
 It is totally free from managed allocations and can run multi-threaded. The Burst compiler heavily vectorizes the searching code.
 
-As a rough benchmark, the included demo rebuilds the KD tree in about 1.0ms for 20.000 points, and does 10 queries for the 20 nearest neighbours in about 0.2ms, on a i7-7700hq, single th  readed.
+As a rough benchmark, the included demo rebuilds the KD tree in about ~1.0ms for 20.000 points, and does 10 queries for the 20 nearest neighbours in about ~0.08ms, on a i7-7700hq.
 
 The implementation is a heavily modified version of a KD-Tree by viliwonka: https://github.com/viliwonka/KDTree . It only includes a sub-set of functionality however.
 
