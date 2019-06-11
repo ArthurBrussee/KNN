@@ -82,7 +82,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 	// After particle job
 	void LateUpdate() {
 		// Rebuild our datastructure
-		var rebuild = new KNearestQueryJob(m_container);
+		var rebuild = new KnnRebuildJob(m_container);
 		var rebuildHandle = rebuild.Schedule();
 
 		// Get all probe positions / colors

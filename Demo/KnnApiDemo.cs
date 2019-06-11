@@ -30,7 +30,7 @@ public static class KnnApiDemo  {
 		// The result array at this point contains indices into the points array with the nearest neighbours!
 		
 		// Get a job to do the query.
-		var queryJob = new KnnQueryJob(knnContainer, queryPosition, result);
+		var queryJob = new KNearestQueryJob(knnContainer, queryPosition, result);
 		
 		// And just run immediately on the main thread for now. This uses Burst!
 		queryJob.Schedule().Complete();
