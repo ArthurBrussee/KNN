@@ -23,7 +23,7 @@ public static class KnnApiDemo  {
 		
 		Profiler.BeginSample("Build");
 		// Create a container that accelerates querying for neighbours
-		var knnContainer = new KnnContainer(points, false, Allocator.TempJob);
+		var knnContainer = new KnnContainer(points, true, Allocator.TempJob);
 		Profiler.EndSample();
 		
 		
@@ -45,10 +45,9 @@ public static class KnnApiDemo  {
 
 		
 		// Or maybe we want to query neighbours for multiple points.
-		const int queryPoints = 1024;
+		const int queryPoints = 100000;
 		
 		// Keep an array of neighbour indices of all points
-		Profiler.BeginSample("Batch Query");
 		var results = new NativeArray<int>(queryPoints * kNeighbours, Allocator.TempJob);
 		
 		// Query at a few random points
@@ -57,11 +56,12 @@ public static class KnnApiDemo  {
 			queryPositions[i] = rand.NextFloat3() * 0.1f;
 		}	
 
+		Profiler.BeginSample("Batch Query");
 		// Fire up job to get results for all points
 		var batchQueryJob = new KNearestBatchQueryJob(knnContainer, queryPositions, results);
 
 		// And just run immediately now. This will run on multiple threads!
-		batchQueryJob.ScheduleBatch(queryPositions.Length, 128).Complete();
+		batchQueryJob.ScheduleBatch(queryPositions.Length, queryPositions.Length / 32).Complete();
 		Profiler.EndSample();
 		
 		
