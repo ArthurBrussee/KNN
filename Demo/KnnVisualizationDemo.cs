@@ -2,6 +2,7 @@
 using Unity.Mathematics;
 using UnityEngine;
 using KNN;
+using KNN.Jobs;
 using Unity.Jobs;
 using UnityEngine.Experimental.ParticleSystemJobs;
 
@@ -88,7 +89,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		}	
 
 		// Rebuild our datastructure
-		var rebuild = m_container.RebuildAsync();
+		var rebuild = new KNearestQueryJob(m_container);
 		var rebuildHandle = rebuild.Schedule();
 		
 		// Get all probe positions / colors
@@ -112,9 +113,10 @@ public class KnnVisualizationDemo : MonoBehaviour {
 
 		
 		// Now do the KNN query
-		var query = m_container.KNearestAsync(m_queryPositions, m_results);
+		var query = new KNearestBatchQueryJob(m_container, m_queryPositions, m_results);
 		
 		// Schedule query, dependent on the rebuild
-		query.Schedule(rebuildHandle).Complete();
+		// We're only doing a very limited number of points - so allow each query to have it's own job
+		query.ScheduleBatch(m_queryPositions.Length, 1, rebuildHandle).Complete();
 	}
 }

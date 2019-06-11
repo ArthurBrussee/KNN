@@ -1,6 +1,7 @@
 ﻿using Unity.Collections;
 using Unity.Mathematics;
 using KNN;
+using KNN.Jobs;
 using Unity.Jobs;
 using Random = Unity.Mathematics.Random;
 
@@ -29,7 +30,7 @@ public static class KnnApiDemo  {
 		// The result array at this point contains indices into the points array with the nearest neighbours!
 		
 		// Get a job to do the query.
-		var queryJob = knnContainer.KNearestAsync(queryPosition, result);
+		var queryJob = new KnnQueryJob(knnContainer, queryPosition, result);
 		
 		// And just run immediatly on the main thread for now. This uses Burst!
 		queryJob.Schedule().Complete();
@@ -47,37 +48,13 @@ public static class KnnApiDemo  {
 		}	
 
 		// Fire up job to get results for all points
-		var batchQueryJob = knnContainer.KNearestAsync(queryPositions, results);
+		var batchQueryJob = new KNearestBatchQueryJob(knnContainer, queryPositions, results);
 
-		// And just run immediatly on main thread for now
-		batchQueryJob.Schedule().Complete();
-		
-		
-		// Or maybe we're querying a _ton_ of points (1024 isn't that much but we'll roll with it)
-		// It's a little cumbersome, but we can multi-thread this ourselves
-		// This will hopefully someday be wrapped in a clean API
-		const int jobCount = 8;
-		var handles = new NativeArray<JobHandle>(jobCount, Allocator.TempJob);
-
-		for (int t = 0; t < jobCount; ++t) {
-			// Figure out indices to schedule
-			int scheduleRange = queryPositions.Length / jobCount;
-			int start = scheduleRange * t;
-			int scheduleCount = t == jobCount - 1 ? queryPositions.Length - start : scheduleRange;
-
-			var posSlice = queryPositions.Slice(start, scheduleCount);
-			var resultSlice = results.Slice(start * kNeighbours, scheduleCount * kNeighbours);
-			var job = knnContainer.KNearestAsync(posSlice, resultSlice);
-			handles[t] = job.Schedule();
-		}
-
-		// Wait for all jobs to be done, will run on multiple threads using burst!
-		JobHandle.CompleteAll(handles);
+		// And just run immediatly now. This will run on multiple threads!
+		batchQueryJob.ScheduleBatch(queryPositions.Length, 128).Complete();
 		
 		// Now the results array contains all the neighbours!
-
 		knnContainer.Dispose();
-		handles.Dispose();
 		queryPositions.Dispose();
 		results.Dispose();
 		points.Dispose();
