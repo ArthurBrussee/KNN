@@ -1,0 +1,17 @@
+{
+    "name": "com.akb.knn",
+    "displayName": "KNN",
+    "version": "1.0.0",
+    "unity": "2019.1",
+    "description": "Super fast K-nearest neighbour search using Burst and Unity's job system",
+    "keywords": [
+        "knn",
+        "unity"
+    ],
+    "category": "Unity",
+    "dependencies": {
+        "com.unity.burst": "1.0.4",
+        "com.unity.mathematics": "1.0.1",
+        "com.unity.collections": "0.0.9-preview.20"
+    }
+}
