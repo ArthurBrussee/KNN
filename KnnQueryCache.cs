@@ -27,11 +27,11 @@ using Unity.Collections;
 using KNN.Internal;
 
 namespace KNN {
-	// TODO: Do we grow some of this dynamically?
 	public struct KnnQueryCache : IDisposable {
 		public int Count;
 		public KSmallestHeap Heap;
 		public MinHeap MinHeap;
+		
 		public NativeArray<KdQueryNode> QueueArray;
 
 		public void Dispose() {
