@@ -87,8 +87,8 @@ namespace KNN {
 
 		// Searching a node -> ~10 cycles
 		// Cache miss: ~500 cycles
-		// So 64 nodes per leaf should more or less balance perf
-		const int c_maxPointsPerLeafNode = 32;
+		// So 256 nodes per leaf should more or less balance perf
+		const int c_maxPointsPerLeafNode = 256;
 
 		public KnnContainer(NativeArray<float3> points, bool build = true) {
 			int nodeCountEstimate = 4 * (int) math.ceil(points.Length / (float) c_maxPointsPerLeafNode + 1) + 1;
@@ -160,7 +160,7 @@ namespace KNN {
 		}
 
 		int GetKdNode(KdNodeBounds bounds, int start, int end) {
-			KdNode node = new KdNode {
+			m_nodes.Add(new KdNode {
 				Bounds = bounds,
 				Start = start,
 				End = end,
@@ -168,9 +168,8 @@ namespace KNN {
 				PartitionCoordinate = 0.0f,
 				PositiveChildIndex = -1,
 				NegativeChildIndex = -1
-			};
+			});
 			
-			m_nodes.Add(node);
 			return m_nodes.Length - 1;
 		}
 
@@ -459,7 +458,7 @@ namespace KNN {
 			queryNode.Distance = sqrDist;
 			cache.MinHeap.PushObj(queryNode, sqrDist);
 		}
-
+	
 		// TODO: really want to make this a burst-compiled delegate!
 		public void KNearest(float3 queryPosition, NativeSlice<int> result, KnnQueryCache cache) {
 			CalculateKnn(result.Length, queryPosition, ref cache);
