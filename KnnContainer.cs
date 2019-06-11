@@ -37,19 +37,17 @@ namespace KNN.Internal {
 	[BurstCompile(CompileSynchronously = true)]
 	public struct KnnJob : IJob {
 		public NativeSlice<int> Result;
-		public KnnQueryCache Cache;
 		public float3 QueryPosition;
 		public KnnContainer Container;
 
 		void IJob.Execute() {
-			Container.KNearest(QueryPosition, Result, Cache);
+			Container.KNearest(QueryPosition, Result);
 		}
 	}
 
 	// Note: You might want to use IJobParralelForBatch instead, for even higher efficiency
 	[BurstCompile(CompileSynchronously = true)]
 	public struct KnnBatchJob : IJob {
-		public KnnQueryCache Cache;
 		public KnnContainer Container;
 
 		[ReadOnly] public NativeSlice<float3> QueryPositions;
@@ -65,7 +63,7 @@ namespace KNN.Internal {
 			// Write results to proper slice!
 			for (int index = 0; index < QueryPositions.Length; ++index) {
 				var resultsSlice = Results.Slice(index * K, K);
-				Container.KNearest(QueryPositions[index], resultsSlice, Cache);
+				Container.KNearest(QueryPositions[index], resultsSlice);
 			}
 		}
 	}
@@ -81,9 +79,7 @@ namespace KNN.Internal {
 }
 
 namespace KNN {
-	[NativeContainerSupportsDeallocateOnJobCompletion]
-	[NativeContainer]
-	[DebuggerDisplay("Length = {Points.Length}")]
+	[NativeContainerSupportsDeallocateOnJobCompletion, NativeContainer, DebuggerDisplay("Length = {Points.Length}")]
 	public struct KnnContainer {
 		// We manage safety by our own sentinel. Disable unity's safety system for internal caches / arrays
 		[NativeDisableContainerSafetyRestriction]
@@ -100,7 +96,7 @@ namespace KNN {
 
 		[NativeDisableContainerSafetyRestriction]
 		NativeQueue<int> m_buildQueue;
-		
+
 		public KdNode RootNode => m_nodes[m_rootNodeIndex[0]];
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -109,7 +105,7 @@ namespace KNN {
 		[NativeSetClassTypeToNullOnSchedule]
 		internal DisposeSentinel m_DisposeSentinel;
 #endif
-		
+
 		const int c_maxPointsPerLeafNode = 256;
 
 		public KnnContainer(NativeArray<float3> points, bool buildNow, Allocator allocator) {
@@ -118,12 +114,12 @@ namespace KNN {
 
 			// Both arrays are filled in as we go, so start with unitialized mem
 			m_nodes = new NativeList<KdNode>(nodeCountEstimate, allocator);
-			
+
 			// Dumb way to create an int* essentially..
 			m_permutation = new NativeArray<int>(points.Length, allocator, NativeArrayOptions.UninitializedMemory);
 			m_rootNodeIndex = new NativeArray<int>(new[] {-1}, allocator);
 			m_buildQueue = new NativeQueue<int>(allocator);
-			
+
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 			if (allocator <= Allocator.None) {
 				throw new ArgumentException("Allocator must be Temp, TempJob or Persistent", nameof(allocator));
@@ -135,7 +131,7 @@ namespace KNN {
 
 			DisposeSentinel.Create(out m_Safety, out m_DisposeSentinel, 0, allocator);
 #endif
-			
+
 			if (buildNow) {
 				Rebuild();
 			}
@@ -152,13 +148,13 @@ namespace KNN {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 			AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-			
+
 			m_nodes.Clear();
-			
+
 			for (int i = 0; i < m_permutation.Length; ++i) {
 				m_permutation[i] = i;
 			}
-			
+
 			int rootNode = GetKdNode(MakeBounds(), 0, Points.Length);
 
 			m_rootNodeIndex[0] = rootNode;
@@ -182,7 +178,7 @@ namespace KNN {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 			DisposeSentinel.Dispose(ref m_Safety, ref m_DisposeSentinel);
 #endif
-			
+
 			m_permutation.Dispose();
 			m_nodes.Dispose();
 			m_rootNodeIndex.Dispose();
@@ -199,7 +195,7 @@ namespace KNN {
 				PositiveChildIndex = -1,
 				NegativeChildIndex = -1
 			});
-			
+
 			return m_nodes.Length - 1;
 		}
 
@@ -317,8 +313,7 @@ namespace KNN {
 			return b;
 		}
 
-		
-		// TODO: When multiple points overlap exactly this function breaks... 
+		// TODO: When multiple points overlap exactly this function breaks.
 		/// <summary>
 		/// Recursive splitting procedure
 		/// </summary>
@@ -402,7 +397,7 @@ namespace KNN {
 			// this for loop section is used both for sorted and unsorted data
 			for (int i = start; i < end; i++) {
 				float val = Points[m_permutation[i]][axis];
-				
+
 				if (val < midPoint) {
 					negative = true;
 				} else {
@@ -428,7 +423,7 @@ namespace KNN {
 
 			for (int i = start; i < end; i++) {
 				float val = Points[m_permutation[i]][axis];
-				
+
 				if (posMin > val) {
 					posMin = val;
 				}
@@ -479,77 +474,46 @@ namespace KNN {
 			}
 		}
 
-		void PushToHeap(in KdNode node, float3 tempClosestPoint, float3 queryPosition, ref KnnQueryCache cache) {
+		void PushToHeap(in KdNode node, float3 tempClosestPoint, float3 queryPosition, NativeList<KdQueryNode> queryQueue, ref MinHeap minHeap) {
 			float sqrDist = math.lengthsq(tempClosestPoint - queryPosition);
-			KdQueryNode queryNode = cache.QueueArray[cache.Count];
-			cache.Count++;
+
+			KdQueryNode queryNode;
 			queryNode.Node = node;
 			queryNode.TempClosestPoint = tempClosestPoint;
 			queryNode.Distance = sqrDist;
-			cache.MinHeap.PushObj(queryNode, sqrDist);
+
+			queryQueue.Add(queryNode);
+			minHeap.PushObj(queryNode, sqrDist);
 		}
-	
+
 		// TODO: really want to make this a burst-compiled delegate!
-		public void KNearest(float3 queryPosition, NativeSlice<int> result, KnnQueryCache cache) {
+		public void KNearest(float3 queryPosition, NativeSlice<int> result) {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 			AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-			
-			CalculateKnn(result.Length, queryPosition, ref cache);
 
-			int retCount = result.Length + 1;
-			for (int i = 1; i < retCount; i++) {
-				result[i - 1] = cache.Heap.PopObj();
-			}
-		}
+			int k = result.Length;
 
-		public KnnJob KNearestAsync(float3 queryPosition, NativeSlice<int> result, KnnQueryCache cache) {
-			var job = new KnnJob {
-				Result = result,
-				Cache = cache,
-				QueryPosition = queryPosition,
-				Container = this
-			};
-			return job;
-		}
+			var heap = new KSmallestHeap(k, Allocator.Temp);
+			var queueList = new NativeList<KdQueryNode>(k * 2, Allocator.Temp);
+			var minHeap = new MinHeap(k * 4, Allocator.Temp);
 
-		public KnnBatchJob KNearestAsync(NativeSlice<float3> queryPositions, NativeSlice<int> results, KnnQueryCache cache) {
-			if (queryPositions.Length == 0 || results.Length % queryPositions.Length != 0) {
-				Debug.LogError("Make sure your results array is a multiple in length of your querypositions array!");
-				return default;
-			}
-
-			int k = results.Length / queryPositions.Length;
-
-			var job = new KnnBatchJob {
-				Results = results,
-				Cache = cache,
-				QueryPositions = queryPositions,
-				Container = this,
-				K = k
-			};
-			return job;
-		}
-
-		void CalculateKnn(int k, float3 queryPosition, ref KnnQueryCache cache) {
 			var points = Points;
 			var permutation = m_permutation;
 			var rootNode = RootNode;
 			var nodes = m_nodes;
 			int queryIndex = 0; // current index at stack
 
-			cache.Reset();
-
 			// Biggest Smallest Squared Radius
 			float bssr = float.PositiveInfinity;
 			float3 rootClosestPoint = rootNode.Bounds.ClosestPoint(queryPosition);
-			PushToHeap(rootNode, rootClosestPoint, queryPosition, ref cache);
+			PushToHeap(rootNode, rootClosestPoint, queryPosition, queueList, ref minHeap);
 
 			// searching
-			while (cache.MinHeap.Count > 0) {
-				KdQueryNode queryNode = cache.MinHeap.PopObj();
+			while (minHeap.Count > 0) {
+				KdQueryNode queryNode = minHeap.PopObj();
 
-				cache.QueueArray[queryIndex] = queryNode;
+				queueList[queryIndex] = queryNode;
 				queryIndex++;
 
 				if (queryNode.Distance > bssr) {
@@ -568,25 +532,25 @@ namespace KNN {
 						// we already know we are on the side of negative bound/node,
 						// so we don't need to test for distance
 						// push to stack for later querying
-						PushToHeap(nodes[node.NegativeChildIndex], tempClosestPoint, queryPosition, ref cache);
+						PushToHeap(nodes[node.NegativeChildIndex], tempClosestPoint, queryPosition, queueList, ref minHeap);
 
 						// project the tempClosestPoint to other bound
 						tempClosestPoint[partitionAxis] = partitionCoord;
 
 						if (nodes[node.PositiveChildIndex].Count != 0) {
-							PushToHeap(nodes[node.PositiveChildIndex], tempClosestPoint, queryPosition, ref cache);
+							PushToHeap(nodes[node.PositiveChildIndex], tempClosestPoint, queryPosition, queueList, ref minHeap);
 						}
 					} else {
 						// we already know we are on the side of positive bound/node,
 						// so we don't need to test for distance
 						// push to stack for later querying
-						PushToHeap(nodes[node.PositiveChildIndex], tempClosestPoint, queryPosition, ref cache);
+						PushToHeap(nodes[node.PositiveChildIndex], tempClosestPoint, queryPosition, queueList, ref minHeap);
 
 						// project the tempClosestPoint to other bound
 						tempClosestPoint[partitionAxis] = partitionCoord;
 
 						if (nodes[node.PositiveChildIndex].Count != 0) {
-							PushToHeap(nodes[node.NegativeChildIndex], tempClosestPoint, queryPosition, ref cache);
+							PushToHeap(nodes[node.NegativeChildIndex], tempClosestPoint, queryPosition, queueList, ref minHeap);
 						}
 					}
 				} else {
@@ -595,15 +559,46 @@ namespace KNN {
 						float sqrDist = math.lengthsq(points[index] - queryPosition);
 
 						if (sqrDist <= bssr) {
-							cache.Heap.PushObj(index, sqrDist);
+							heap.PushObj(index, sqrDist);
 
-							if (cache.Heap.Count == k) {
-								bssr = cache.Heap.HeadValue;
+							if (heap.Count == k) {
+								bssr = heap.HeadValue;
 							}
 						}
 					}
 				}
 			}
+
+			int retCount = result.Length + 1;
+			for (int i = 1; i < retCount; i++) {
+				result[i - 1] = heap.PopObj();
+			}
+		}
+
+		public KnnJob KNearestAsync(float3 queryPosition, NativeSlice<int> result) {
+			var job = new KnnJob {
+				Result = result,
+				QueryPosition = queryPosition,
+				Container = this
+			};
+			return job;
+		}
+
+		public KnnBatchJob KNearestAsync(NativeSlice<float3> queryPositions, NativeSlice<int> results) {
+			if (queryPositions.Length == 0 || results.Length % queryPositions.Length != 0) {
+				Debug.LogError("Make sure your results array is a multiple in length of your querypositions array!");
+				return default;
+			}
+
+			int k = results.Length / queryPositions.Length;
+
+			var job = new KnnBatchJob {
+				Results = results,
+				QueryPositions = queryPositions,
+				Container = this,
+				K = k
+			};
+			return job;
 		}
 	}
 }

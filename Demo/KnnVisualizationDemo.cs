@@ -22,7 +22,6 @@ public class KnnVisualizationDemo : MonoBehaviour {
 	NativeArray<int> m_results;
 	
 	KnnContainer m_container;
-	KnnQueryCache m_cache;
 
 	int frame = 0;
 	
@@ -32,15 +31,12 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		m_system.Emit(ParticleCount);
 		m_points = new NativeArray<float3>(ParticleCount, Allocator.Persistent);
 
-		m_cache = KnnQueryCache.Create(QueryK, Allocator.Persistent);
-		
 		// Create a container that accelerates querying for neighbours
 		m_container = new KnnContainer(m_points, false, Allocator.Persistent); // Skip building for now. We rebuild every frame
 	}
 
 	void OnDestroy() {
 		m_points.Dispose();
-		m_cache.Dispose();
 		m_container.Dispose();
 		m_results.Dispose();
 		m_queryPositions.Dispose();
@@ -116,7 +112,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 
 		
 		// Now do the KNN query
-		var query = m_container.KNearestAsync(m_queryPositions, m_results, m_cache);
+		var query = m_container.KNearestAsync(m_queryPositions, m_results);
 		
 		// Schedule query, dependent on the rebuild
 		query.Schedule(rebuildHandle).Complete();
