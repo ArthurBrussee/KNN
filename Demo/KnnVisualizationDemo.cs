@@ -32,10 +32,10 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		m_system.Emit(ParticleCount);
 		m_points = new NativeArray<float3>(ParticleCount, Allocator.Persistent);
 
-		m_cache = KnnQueryCache.Create(QueryK);
+		m_cache = KnnQueryCache.Create(QueryK, Allocator.Persistent);
 		
 		// Create a container that accelerates querying for neighbours
-		m_container = new KnnContainer(m_points, build:false); // Skip building for now. We rebuild every frame
+		m_container = new KnnContainer(m_points, false, Allocator.Persistent); // Skip building for now. We rebuild every frame
 	}
 
 	void OnDestroy() {

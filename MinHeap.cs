@@ -32,9 +32,9 @@ namespace KNN.Internal {
 		
 		public KdQueryNode HeadHeapObject => objs[1];
 
-		public MinHeap(int maxNodes) {
-			objs = new NativeArray<KdQueryNode>(maxNodes + 1, Allocator.Persistent);
-			heap = new NativeArray<float>(maxNodes + 1, Allocator.Persistent);
+		public MinHeap(int maxNodes, Allocator allocator) {
+			objs = new NativeArray<KdQueryNode>(maxNodes + 1, allocator);
+			heap = new NativeArray<float>(maxNodes + 1, allocator);
 			Count = 0;
 		}
 		

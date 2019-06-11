@@ -22,15 +22,18 @@
 //
 // Modifed 2019 Arthur Brussee
 
+using System;
+using System.Diagnostics;
 using KNN.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEngine;
+using Debug = UnityEngine.Debug;
 
-namespace KNN {
+// Jobs for querying
+namespace KNN.Internal {
 	[BurstCompile(CompileSynchronously = true)]
 	public struct KnnJob : IJob {
 		public NativeSlice<int> Result;
@@ -67,55 +70,74 @@ namespace KNN {
 		}
 	}
 
+	[BurstCompile(CompileSynchronously = true)]
+	public struct RebuildJob : IJob {
+		public KnnContainer Container;
+
+		public void Execute() {
+			Container.Rebuild();
+		}
+	}
+}
+
+namespace KNN {
+	[NativeContainerSupportsDeallocateOnJobCompletion]
+	[NativeContainer]
+	[DebuggerDisplay("Length = {Points.Length}")]
 	public struct KnnContainer {
-		// People often schedule togethere jobs with a container like this
-		// And query positions, which come from the same positions array
-		// We don't want to copy over said array on construction
-		// And we don't want to have people pass in the positions all the time
-		// So instead we just tell Unity to shut up for now, it's fine to schedule these together
-		// We're only reading from them.
-		[ReadOnly, NativeDisableContainerSafetyRestriction]
+		// We manage safety by our own sentinel. Disable unity's safety system for internal caches / arrays
+		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<float3> Points;
-		
+
+		[NativeDisableContainerSafetyRestriction]
 		NativeArray<int> m_permutation;
+
+		[NativeDisableContainerSafetyRestriction]
 		NativeList<KdNode> m_nodes;
+
+		[NativeDisableContainerSafetyRestriction]
 		NativeArray<int> m_rootNodeIndex;
 
+		[NativeDisableContainerSafetyRestriction]
 		NativeQueue<int> m_buildQueue;
 		
 		public KdNode RootNode => m_nodes[m_rootNodeIndex[0]];
 
-		// Searching a node -> ~10 cycles
-		// Cache miss: ~500 cycles
-		// So 256 nodes per leaf should more or less balance perf
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+		// Note: MUST be named m_Safey, m_DisposeSentinel exactly
+		internal AtomicSafetyHandle m_Safety;
+		[NativeSetClassTypeToNullOnSchedule]
+		internal DisposeSentinel m_DisposeSentinel;
+#endif
+		
 		const int c_maxPointsPerLeafNode = 256;
 
-		public KnnContainer(NativeArray<float3> points, bool build = true) {
+		public KnnContainer(NativeArray<float3> points, bool buildNow, Allocator allocator) {
 			int nodeCountEstimate = 4 * (int) math.ceil(points.Length / (float) c_maxPointsPerLeafNode + 1) + 1;
 			Points = points;
 
 			// Both arrays are filled in as we go, so start with unitialized mem
-			m_nodes = new NativeList<KdNode>(nodeCountEstimate, Allocator.Persistent);
+			m_nodes = new NativeList<KdNode>(nodeCountEstimate, allocator);
 			
 			// Dumb way to create an int* essentially..
-			m_permutation = new NativeArray<int>(points.Length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-
-			// m_nodesCount = 0;
-			m_rootNodeIndex = new NativeArray<int>(new[] {-1}, Allocator.Persistent);
-
-			m_buildQueue = new NativeQueue<int>(Allocator.Persistent);
-
-			if (build) {
-				Rebuild();
+			m_permutation = new NativeArray<int>(points.Length, allocator, NativeArrayOptions.UninitializedMemory);
+			m_rootNodeIndex = new NativeArray<int>(new[] {-1}, allocator);
+			m_buildQueue = new NativeQueue<int>(allocator);
+			
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+			if (allocator <= Allocator.None) {
+				throw new ArgumentException("Allocator must be Temp, TempJob or Persistent", nameof(allocator));
 			}
-		}
 
-		[BurstCompile(CompileSynchronously = true)]
-		public struct RebuildJob : IJob {
-			public KnnContainer Container;
+			if (points.Length <= 0) {
+				throw new ArgumentOutOfRangeException(nameof(points), "Input points length must be >= 0");
+			}
 
-			public void Execute() {
-				Container.Rebuild();
+			DisposeSentinel.Create(out m_Safety, out m_DisposeSentinel, 0, allocator);
+#endif
+			
+			if (buildNow) {
+				Rebuild();
 			}
 		}
 
@@ -127,6 +149,10 @@ namespace KNN {
 		}
 
 		public void Rebuild() {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+			AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
+#endif
+			
 			m_nodes.Clear();
 			
 			for (int i = 0; i < m_permutation.Length; ++i) {
@@ -153,6 +179,10 @@ namespace KNN {
 		}
 
 		public void Dispose() {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+			DisposeSentinel.Dispose(ref m_Safety, ref m_DisposeSentinel);
+#endif
+			
 			m_permutation.Dispose();
 			m_nodes.Dispose();
 			m_rootNodeIndex.Dispose();
@@ -461,6 +491,10 @@ namespace KNN {
 	
 		// TODO: really want to make this a burst-compiled delegate!
 		public void KNearest(float3 queryPosition, NativeSlice<int> result, KnnQueryCache cache) {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+			AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
+#endif
+			
 			CalculateKnn(result.Length, queryPosition, ref cache);
 
 			int retCount = result.Length + 1;

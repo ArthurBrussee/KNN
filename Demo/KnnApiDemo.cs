@@ -13,17 +13,16 @@ public static class KnnApiDemo  {
 			points[i] = rand.NextFloat3();
 		}
 
-
 		// Number of neighbours we want to query
 		const int kNeighbours = 10;
 		float3 queryPosition = float3.zero;
 		
 		// Create a container that accelerates querying for neighbours
-		var knnContainer = new KnnContainer(points);
+		var knnContainer = new KnnContainer(points, true, Allocator.TempJob);
 
 		// Create an object that allocates memory necessary for queries
 		// We can't do this in a job so it is seperated, and this allows for efficient re-use!
-		var cache = KnnQueryCache.Create(kNeighbours);
+		var cache = KnnQueryCache.Create(kNeighbours, Allocator.TempJob);
 
 		// Most basic usage:
 		// Get 10 nearest neighbours as indices into our points array!
@@ -33,14 +32,12 @@ public static class KnnApiDemo  {
 		
 		// The result array at this point contains indices into the points array with the nearest neighbours!
 		
-		
 		// Get a job to do the query.
 		var queryJob = knnContainer.KNearestAsync(queryPosition, result, cache);
 		
 		// And just run immediatly on the main thread for now. This uses Burst!
 		queryJob.Schedule().Complete();
 
-		
 		// Or maybe we want to query neighbours for multiple points.
 		const int queryPoints = 1024;
 		
@@ -53,13 +50,11 @@ public static class KnnApiDemo  {
 			queryPositions[i] = rand.NextFloat3() * 0.1f;
 		}	
 
-		
 		// Fire up job to get results for all points
 		var batchQueryJob = knnContainer.KNearestAsync(queryPositions, results, cache);
 
 		// And just run immediatly on main thread for now
 		batchQueryJob.Schedule().Complete();
-
 		
 		
 		// Or maybe we're querying a _ton_ of points (1024 isn't that much but we'll roll with it)
@@ -77,7 +72,7 @@ public static class KnnApiDemo  {
 			int start = scheduleRange * t;
 			int scheduleCount = t == jobCount - 1 ? queryPositions.Length - start : scheduleRange;
 
-			caches[t] = KnnQueryCache.Create(kNeighbours);
+			caches[t] = KnnQueryCache.Create(kNeighbours, Allocator.TempJob);
 
 			var posSlice = queryPositions.Slice(start, scheduleCount);
 			var resultSlice = results.Slice(start * kNeighbours, scheduleCount * kNeighbours);

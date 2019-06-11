@@ -31,7 +31,6 @@ namespace KNN {
 		public int Count;
 		public KSmallestHeap Heap;
 		public MinHeap MinHeap;
-		
 		public NativeArray<KdQueryNode> QueueArray;
 
 		public void Dispose() {
@@ -46,12 +45,12 @@ namespace KNN {
 			MinHeap.Clear();
 		}
 
-		public static KnnQueryCache Create(int maxKQuery) {
+		public static KnnQueryCache Create(int maxKQuery, Allocator allocator) {
 			KnnQueryCache s;
 			s.Count = 0;
-			s.Heap = new KSmallestHeap(maxKQuery);
-			s.MinHeap = new MinHeap(maxKQuery * 4);
-			s.QueueArray = new NativeArray<KdQueryNode>(512, Allocator.Persistent);
+			s.Heap = new KSmallestHeap(maxKQuery, allocator);
+			s.MinHeap = new MinHeap(maxKQuery * 4, allocator);
+			s.QueueArray = new NativeArray<KdQueryNode>(512, allocator);
 			return s;
 		}
 	}

@@ -36,10 +36,10 @@ namespace KNN.Internal {
 		public bool Full => maxSize == Count;
 		public float HeadValue => heap[1];
 		
-		public KSmallestHeap(int maxEntries) {
+		public KSmallestHeap(int maxEntries, Allocator allocator) {
 			maxSize = maxEntries;
-			heap = new NativeArray<float>(maxEntries + 1, Allocator.Persistent);
-			objs = new NativeArray<int>(maxEntries + 1, Allocator.Persistent);
+			heap = new NativeArray<float>(maxEntries + 1, allocator);
+			objs = new NativeArray<int>(maxEntries + 1, allocator);
 			Count = 0;
 		}
 		
