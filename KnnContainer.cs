@@ -25,8 +25,10 @@
 using System;
 using System.Diagnostics;
 using KNN.Internal;
+using KNN.Jobs;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace KNN {
@@ -99,10 +101,12 @@ namespace KNN {
 #endif
 
 			if (buildNow) {
-				Rebuild();
+				var rebuild = new KnnRebuildJob(this);
+				rebuild.Schedule().Complete();
 			}
 		}
 
+		// TODO: Really want to make this a burst delegate!
 		public void Rebuild() {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 			AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
