@@ -58,7 +58,7 @@ namespace KNN.Jobs {
 			// Write results to proper slice!
 			for (int index = startIndex; index < startIndex + count; ++index) {
 				var resultsSlice = m_results.Slice(index * m_k, m_k);
-				m_container.KNearest(m_queryPositions[index], resultsSlice, temp);
+				m_container.KNearest(m_queryPositions[index], resultsSlice, ref temp);
 			}
 		}
 	}

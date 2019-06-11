@@ -50,7 +50,7 @@ namespace KNN {
 		[NativeDisableContainerSafetyRestriction]
 		NativeQueue<int> m_buildQueue;
 
-		public KdNode RootNode => m_nodes[m_rootNodeIndex[0]];
+		KdNode RootNode => m_nodes[m_rootNodeIndex[0]];
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 		// Note: MUST be named m_Safey, m_DisposeSentinel exactly
@@ -63,15 +63,12 @@ namespace KNN {
 
 		public struct KnnQueryTemp {
 			public KSmallestHeap Heap;
-			public NativeList<KdQueryNode> QueueList;
 			public MinHeap MinHeap;
 
 			public static KnnQueryTemp Create(int k) {
 				KnnQueryTemp temp;
 				temp.Heap = new KSmallestHeap(k, Allocator.Temp);
-				temp.QueueList = new NativeList<KdQueryNode>(k * 2, Allocator.Temp);
 				temp.MinHeap = new MinHeap(k * 4, Allocator.Temp);
-
 				return temp;
 			}
 		}
@@ -80,7 +77,7 @@ namespace KNN {
 			int nodeCountEstimate = 4 * (int) math.ceil(points.Length / (float) c_maxPointsPerLeafNode + 1) + 1;
 			Points = points;
 
-			// Both arrays are filled in as we go, so start with unitialized mem
+			// Both arrays are filled in as we go, so start with uninitialized mem
 			m_nodes = new NativeList<KdNode>(nodeCountEstimate, allocator);
 
 			// Dumb way to create an int* essentially..
@@ -304,13 +301,13 @@ namespace KNN {
 			float boundsStart = parentBounds.Min[splitAxis];
 			float boundsEnd = parentBounds.Max[splitAxis];
 
-			// Calculate the spliting coords
+			// Calculate the spiting coords
 			float splitPivot = CalculatePivot(parent.Start, parent.End, boundsStart, boundsEnd, splitAxis);
 
 			parent.PartitionAxis = splitAxis;
 			parent.PartitionCoordinate = splitPivot;
 
-			// 'Spliting' array to two subarrays
+			// 'Spiting' array to two sub arrays
 			int splittingIndex = Partition(parent.Start, parent.End, splitPivot, splitAxis);
 
 			// Negative / Left node
@@ -436,16 +433,15 @@ namespace KNN {
 				}
 			}
 		}
-
-		void PushToHeap(in KdNode node, float3 tempClosestPoint, float3 queryPosition, ref KnnQueryTemp temp) {
+		
+		void PushToHeap(int nodeIndex, float3 tempClosestPoint, float3 queryPosition, ref KnnQueryTemp temp) {
 			float sqrDist = math.lengthsq(tempClosestPoint - queryPosition);
 
 			KdQueryNode queryNode;
-			queryNode.Node = node;
+			queryNode.NodeIndex = nodeIndex;
 			queryNode.TempClosestPoint = tempClosestPoint;
 			queryNode.Distance = sqrDist;
 
-			temp.QueueList.Add(queryNode);
 			temp.MinHeap.PushObj(queryNode, sqrDist);
 		}
 
@@ -455,67 +451,62 @@ namespace KNN {
 			AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
 			var temp = KnnQueryTemp.Create(result.Length);
-			KNearest(queryPosition, result, temp);
+			KNearest(queryPosition, result, ref temp);
 		}
-
-		internal void KNearest(float3 queryPosition, NativeSlice<int> result, KnnQueryTemp temp) {
+		
+		internal unsafe void KNearest(float3 queryPosition, NativeSlice<int> result, ref KnnQueryTemp temp) {
 			int k = result.Length;
-			temp.QueueList.Clear();
 			temp.Heap.Clear();
 			
 			var points = Points;
 			var permutation = m_permutation;
 			var rootNode = RootNode;
-			var nodes = m_nodes;
-			int queryIndex = 0; // current index at stack
-
+			var nodePtr = m_nodes.GetUnsafePtr();
+			
 			// Biggest Smallest Squared Radius
 			float bssr = float.PositiveInfinity;
 			float3 rootClosestPoint = rootNode.Bounds.ClosestPoint(queryPosition);
-			PushToHeap(rootNode, rootClosestPoint, queryPosition, ref temp);
+			
+			PushToHeap(m_rootNodeIndex[0], rootClosestPoint, queryPosition, ref temp);
 			
 			// searching
 			while (temp.MinHeap.Count > 0) {
 				KdQueryNode queryNode = temp.MinHeap.PopObj();
 
-				temp.QueueList[queryIndex] = queryNode;
-				queryIndex++;
-
 				if (queryNode.Distance > bssr) {
 					continue;
 				}
 
-				KdNode node = queryNode.Node;
+				ref var node = ref UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex);
 
 				if (!node.Leaf) {
 					int partitionAxis = node.PartitionAxis;
 					float partitionCoord = node.PartitionCoordinate;
-
 					float3 tempClosestPoint = queryNode.TempClosestPoint;
 
 					if (tempClosestPoint[partitionAxis] - partitionCoord < 0) {
 						// we already know we are on the side of negative bound/node,
 						// so we don't need to test for distance
 						// push to stack for later querying
-						PushToHeap(nodes[node.NegativeChildIndex], tempClosestPoint, queryPosition, ref temp);
+						PushToHeap(node.NegativeChildIndex, tempClosestPoint, queryPosition, ref temp);
 
 						// project the tempClosestPoint to other bound
 						tempClosestPoint[partitionAxis] = partitionCoord;
 
-						if (nodes[node.PositiveChildIndex].Count != 0) {
-							PushToHeap(nodes[node.PositiveChildIndex], tempClosestPoint, queryPosition, ref temp);
+						if (UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex).Count != 0) {
+							PushToHeap(node.PositiveChildIndex, tempClosestPoint, queryPosition, ref temp);
 						}
 					} else {
 						// we already know we are on the side of positive bound/node,
 						// so we don't need to test for distance
 						// push to stack for later querying
-						PushToHeap(nodes[node.PositiveChildIndex], tempClosestPoint, queryPosition, ref temp);
+						PushToHeap(node.PositiveChildIndex, tempClosestPoint, queryPosition, ref temp);
 
 						// project the tempClosestPoint to other bound
 						tempClosestPoint[partitionAxis] = partitionCoord;
 
-						if (nodes[node.PositiveChildIndex].Count != 0) {
-							PushToHeap(nodes[node.NegativeChildIndex], tempClosestPoint, queryPosition, ref temp);
+						if (UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex).Count != 0) {
+							PushToHeap(node.NegativeChildIndex, tempClosestPoint, queryPosition, ref temp);
 						}
 					}
 				} else {
