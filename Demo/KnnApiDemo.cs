@@ -32,7 +32,7 @@ public static class KnnApiDemo  {
 		// Get a job to do the query.
 		var queryJob = new KnnQueryJob(knnContainer, queryPosition, result);
 		
-		// And just run immediatly on the main thread for now. This uses Burst!
+		// And just run immediately on the main thread for now. This uses Burst!
 		queryJob.Schedule().Complete();
 
 		// Or maybe we want to query neighbours for multiple points.
@@ -50,7 +50,7 @@ public static class KnnApiDemo  {
 		// Fire up job to get results for all points
 		var batchQueryJob = new KNearestBatchQueryJob(knnContainer, queryPositions, results);
 
-		// And just run immediatly now. This will run on multiple threads!
+		// And just run immediately now. This will run on multiple threads!
 		batchQueryJob.ScheduleBatch(queryPositions.Length, 128).Complete();
 		
 		// Now the results array contains all the neighbours!
