@@ -22,10 +22,15 @@ public static class KnnApiDemo  {
 		float3 queryPosition = float3.zero;
 		
 		Profiler.BeginSample("Build");
-		// Create a container that accelerates querying for neighbours
-		var knnContainer = new KnnContainer(points, true, Allocator.TempJob);
+		// Create a container that accelerates querying for neighbours.
+		// The 2nd argument indicates whether we want to build the tree straight away or not
+		// Let's hold off on building it a little bit
+		var knnContainer = new KnnContainer(points, false, Allocator.TempJob);
 		Profiler.EndSample();
 		
+		// Whenever your point cloud changes, you can make a job to rebuild the container:
+		var rebuildJob = new KnnRebuildJob(knnContainer);
+		rebuildJob.Schedule().Complete();
 		
 		// Most basic usage:
 		// Get 10 nearest neighbours as indices into our points array!
