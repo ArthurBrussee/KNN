@@ -7,13 +7,13 @@ using UnityEngine;
 
 namespace KNN.Jobs {
 	[BurstCompile(CompileSynchronously = true)]
-	public struct KnnQueryJob : IJob {
+	public struct KNearestQueryJob : IJob {
 		[ReadOnly] KnnContainer m_container;
 		[WriteOnly] NativeSlice<int> m_result;
 
 		float3 m_queryPosition;
 
-		public KnnQueryJob(KnnContainer container, float3 queryPosition, NativeSlice<int> result) {
+		public KNearestQueryJob(KnnContainer container, float3 queryPosition, NativeSlice<int> result) {
 			m_result = result;
 			m_queryPosition = queryPosition;
 			m_container = container;
@@ -58,16 +58,16 @@ namespace KNN.Jobs {
 			// Write results to proper slice!
 			for (int index = startIndex; index < startIndex + count; ++index) {
 				var resultsSlice = m_results.Slice(index * m_k, m_k);
-				m_container.KNearest(m_queryPositions[index], resultsSlice, temp);
+				m_container.KNearest(m_queryPositions[index], resultsSlice, ref temp);
 			}
 		}
 	}
 
 	[BurstCompile(CompileSynchronously = true)]
-	public struct KNearestQueryJob : IJob {
+	public struct KnnRebuildJob : IJob {
 		KnnContainer m_container;
 
-		public KNearestQueryJob(KnnContainer container) {
+		public KnnRebuildJob(KnnContainer container) {
 			m_container = container;
 		}
 

@@ -30,18 +30,12 @@ namespace KNN.Internal {
 		NativeArray<KdQueryNode> objs;
 		public int Count;
 		
-		public KdQueryNode HeadHeapObject => objs[1];
-
 		public MinHeap(int maxNodes, Allocator allocator) {
 			objs = new NativeArray<KdQueryNode>(maxNodes + 1, allocator);
 			heap = new NativeArray<float>(maxNodes + 1, allocator);
 			Count = 0;
 		}
 		
-		public void Clear() {
-			Count = 0;
-		}
-
 		int Parent(int index) {
 			return index >> 1;
 		}
@@ -125,7 +119,6 @@ namespace KNN.Internal {
 
 			heap[1] = heap[Count];
 			objs[1] = objs[Count];
-
 			objs[Count] = default;
 			Count--;
 

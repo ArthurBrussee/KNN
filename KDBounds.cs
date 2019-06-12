@@ -23,7 +23,6 @@
 // Modifed 2019 Arthur Brussee
 
 using Unity.Mathematics;
-using UnityEngine;
 
 namespace KNN.Internal {
     public struct KdNodeBounds {
@@ -32,15 +31,8 @@ namespace KNN.Internal {
 
         public float3 Size => Max - Min;
 
-        // returns unity bounds
-        public Bounds Bounds =>
-	        new Bounds(
-		        (Min + Max) / 2,
-		        (Max - Min)
-	        );
-
-        public float3 ClosestPoint(float3 point) {
-	        return Bounds.ClosestPoint(point);
-        }
+		public float3 ClosestPoint(float3 point) {
+			return math.clamp(point, Min, Max);
+		}
     }
 }
