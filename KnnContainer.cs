@@ -485,26 +485,12 @@ namespace KNN {
 
 				ref KdNode node = ref UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex);
 
-				if (queryNode.NodeIndex < 0) {
-					Debug.LogError("Pushed a corrupt node somehow..." + queryNode.NodeIndex);
-					continue;
-				}
-
 				if (!node.Leaf) {
 					int partitionAxis = node.PartitionAxis;
 					float partitionCoord = node.PartitionCoordinate;
 					float3 tempClosestPoint = queryNode.TempClosestPoint;
 
-					if (partitionAxis > 2) {
-						Debug.Log("Bad partition: " + queryNode.NodeIndex + ", " + partitionAxis);
-						continue;
-					}
-
 					if (tempClosestPoint[partitionAxis] - partitionCoord < 0) {
-						if (node.NegativeChildIndex < 0) {
-							Debug.LogError(node.NegativeChildIndex + "," + node.PositiveChildIndex);
-						}
-
 						// we already know we are on the side of negative bound/node,
 						// so we don't need to test for distance
 						// push to stack for later querying
