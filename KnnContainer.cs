@@ -23,17 +23,17 @@
 // Modifed 2019 Arthur Brussee
 
 using System;
-using System.Diagnostics;
 using KNN.Internal;
 using KNN.Jobs;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace KNN {
-	[NativeContainerSupportsDeallocateOnJobCompletion, NativeContainer, DebuggerDisplay("Length = {Points.Length}")]
-	public struct KnnContainer {
+	[NativeContainerSupportsDeallocateOnJobCompletion, NativeContainer, System.Diagnostics.DebuggerDisplay("Length = {Points.Length}")]
+	public struct KnnContainer : IDisposable {
 		// We manage safety by our own sentinel. Disable unity's safety system for internal caches / arrays
 		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<float3> Points;
@@ -54,8 +54,10 @@ namespace KNN {
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 		// Note: MUST be named m_Safey, m_DisposeSentinel exactly
+		// ReSharper disable once InconsistentNaming
 		internal AtomicSafetyHandle m_Safety;
 		[NativeSetClassTypeToNullOnSchedule]
+		// ReSharper disable once InconsistentNaming
 		internal DisposeSentinel m_DisposeSentinel;
 #endif
 
@@ -278,7 +280,7 @@ namespace KNN {
 		/// Recursive splitting procedure
 		/// </summary>
 		unsafe void SplitNode(int parentIndex, out int posNodeIndex, out int negNodeIndex) {
-			ref KdNode parent = ref UnsafeUtilityEx.ArrayElementAsRef<KdNode>(m_nodes.GetUnsafePtr(), parentIndex);
+			KdNode parent = m_nodes[parentIndex];
 
 			// center of bounding box
 			KdNodeBounds parentBounds = parent.Bounds;
@@ -304,9 +306,6 @@ namespace KNN {
 			// Calculate the spiting coords
 			float splitPivot = CalculatePivot(parent.Start, parent.End, boundsStart, boundsEnd, splitAxis);
 
-			parent.PartitionAxis = splitAxis;
-			parent.PartitionCoordinate = splitPivot;
-
 			// 'Spiting' array to two sub arrays
 			int splittingIndex = Partition(parent.Start, parent.End, splitPivot, splitAxis);
 
@@ -318,6 +317,9 @@ namespace KNN {
 			bounds.Max = negMax;
 			negNodeIndex = GetKdNode(bounds, parent.Start, splittingIndex);
 
+			parent.PartitionAxis = splitAxis;
+			parent.PartitionCoordinate = splitPivot;
+			
 			// Positive / Right node
 			float3 posMin = parentBounds.Min;
 			posMin[splitAxis] = splitPivot;
@@ -328,6 +330,9 @@ namespace KNN {
 
 			parent.NegativeChildIndex = negNodeIndex;
 			parent.PositiveChildIndex = posNodeIndex;
+
+			// Write back node to array to update those values
+			m_nodes[parentIndex] = parent;
 		}
 
 		/// <summary>
@@ -436,11 +441,12 @@ namespace KNN {
 		
 		void PushToHeap(int nodeIndex, float3 tempClosestPoint, float3 queryPosition, ref KnnQueryTemp temp) {
 			float sqrDist = math.lengthsq(tempClosestPoint - queryPosition);
-
-			KdQueryNode queryNode;
-			queryNode.NodeIndex = nodeIndex;
-			queryNode.TempClosestPoint = tempClosestPoint;
-			queryNode.Distance = sqrDist;
+			
+			KdQueryNode queryNode = new KdQueryNode {
+				NodeIndex = nodeIndex,
+				TempClosestPoint = tempClosestPoint,
+				Distance = sqrDist
+			};
 
 			temp.MinHeap.PushObj(queryNode, sqrDist);
 		}
@@ -477,14 +483,28 @@ namespace KNN {
 					continue;
 				}
 
-				ref var node = ref UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex);
+				ref KdNode node = ref UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex);
+
+				if (queryNode.NodeIndex < 0) {
+					Debug.LogError("Pushed a corrupt node somehow..." + queryNode.NodeIndex);
+					continue;
+				}
 
 				if (!node.Leaf) {
 					int partitionAxis = node.PartitionAxis;
 					float partitionCoord = node.PartitionCoordinate;
 					float3 tempClosestPoint = queryNode.TempClosestPoint;
 
+					if (partitionAxis > 2) {
+						Debug.Log("Bad partition: " + queryNode.NodeIndex + ", " + partitionAxis);
+						continue;
+					}
+
 					if (tempClosestPoint[partitionAxis] - partitionCoord < 0) {
+						if (node.NegativeChildIndex < 0) {
+							Debug.LogError(node.NegativeChildIndex + "," + node.PositiveChildIndex);
+						}
+
 						// we already know we are on the side of negative bound/node,
 						// so we don't need to test for distance
 						// push to stack for later querying
@@ -526,6 +546,7 @@ namespace KNN {
 			}
 
 			int retCount = result.Length + 1;
+			
 			for (int i = 1; i < retCount; i++) {
 				result[i - 1] = temp.Heap.PopObj();
 			}
