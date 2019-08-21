@@ -1,18 +1,18 @@
 {
-    "name": "com.akb.knn",
-    "displayName": "KNN",
-    "version": "1.0.0",
-    "unity": "2019.1",
-    "description": "Super fast K-nearest neighbour search using Burst and Unity's job system",
-    "keywords": [
-        "knn",
-        "unity"
-    ],
-    "category": "Unity",
-    "dependencies": {
-        "com.unity.burst": "1.0.4",
-        "com.unity.mathematics": "1.0.1",
-        "com.unity.collections": "0.0.9-preview.20",
-        "com.unity.jobs": "0.0.7-preview.13"
-    }
+  "name": "com.akb.knn",
+  "displayName": "KNN",
+  "version": "1.0.0",
+  "unity": "2019.2",
+  "description": "Super fast K-nearest neighbour search using Burst and Unity's job system",
+  "keywords": [
+    "knn",
+    "unity"
+  ],
+  "category": "Unity",
+  "dependencies": {
+    "com.unity.burst": "1.1.2",
+    "com.unity.mathematics": "1.0.1",
+    "com.unity.collections": "0.1.1",
+    "com.unity.jobs": "0.1.1"
+  }
 }
