@@ -29,7 +29,6 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEngine;
 
 namespace KNN {
 	[NativeContainerSupportsDeallocateOnJobCompletion, NativeContainer, System.Diagnostics.DebuggerDisplay("Length = {Points.Length}")]
@@ -105,7 +104,6 @@ namespace KNN {
 			}
 		}
 
-		// TODO: Really want to make this a burst delegate!
 		public void Rebuild() {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 			AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
@@ -279,7 +277,7 @@ namespace KNN {
 		/// <summary>
 		/// Recursive splitting procedure
 		/// </summary>
-		unsafe void SplitNode(int parentIndex, out int posNodeIndex, out int negNodeIndex) {
+		void SplitNode(int parentIndex, out int posNodeIndex, out int negNodeIndex) {
 			KdNode parent = m_nodes[parentIndex];
 
 			// center of bounding box
@@ -451,7 +449,6 @@ namespace KNN {
 			temp.MinHeap.PushObj(queryNode, sqrDist);
 		}
 
-		// TODO: really want to make this a burst-compiled delegate!
 		public void KNearest(float3 queryPosition, NativeSlice<int> result) {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 			AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
