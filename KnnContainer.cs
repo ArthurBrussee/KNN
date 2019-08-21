@@ -499,7 +499,7 @@ namespace KNN {
 						// project the tempClosestPoint to other bound
 						tempClosestPoint[partitionAxis] = partitionCoord;
 
-						if (UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex).Count != 0) {
+						if (node.Count != 0) {
 							PushToHeap(node.PositiveChildIndex, tempClosestPoint, queryPosition, ref temp);
 						}
 					} else {
@@ -511,7 +511,7 @@ namespace KNN {
 						// project the tempClosestPoint to other bound
 						tempClosestPoint[partitionAxis] = partitionCoord;
 
-						if (UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex).Count != 0) {
+						if (node.Count != 0) {
 							PushToHeap(node.NegativeChildIndex, tempClosestPoint, queryPosition, ref temp);
 						}
 					}
