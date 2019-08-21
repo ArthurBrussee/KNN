@@ -22,12 +22,18 @@
 //
 // Modifed 2019 Arthur Brussee
 
+using System;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace KNN.Internal {
-	public struct MinHeap {
+	public struct MinHeap : IDisposable {
+		[NativeDisableContainerSafetyRestriction]
 		NativeArray<float> heap;
+
+		[NativeDisableContainerSafetyRestriction]
 		NativeArray<KdQueryNode> objs;
+
 		public int Count;
 		
 		public MinHeap(int maxNodes, Allocator allocator) {

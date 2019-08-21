@@ -22,18 +22,22 @@
 //
 // Modifed 2019 Arthur Brussee
 
+using System;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace KNN.Internal {
 	// array start at index 1
-	public struct KSmallestHeap {
+	public struct KSmallestHeap : IDisposable {
+		[NativeDisableContainerSafetyRestriction]
 		NativeArray<int> objs; //objects
+		
+		[NativeDisableContainerSafetyRestriction]
 		NativeArray<float> heap;
 
 		public int Count;
 		int maxSize;
 
-		public bool Full => maxSize == Count;
 		public float HeadValue => heap[1];
 		
 		public KSmallestHeap(int maxEntries, Allocator allocator) {
