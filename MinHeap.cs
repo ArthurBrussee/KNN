@@ -41,16 +41,16 @@ namespace KNN.Internal {
 			heap = new NativeArray<float>(maxNodes + 1, allocator);
 			Count = 0;
 		}
-		
-		int Parent(int index) {
+
+		static int Parent(int index) {
 			return index >> 1;
 		}
 
-		int Left(int index) {
+		static int Left(int index) {
 			return index << 1;
 		}
 
-		int Right(int index) {
+		static int Right(int index) {
 			return (index << 1) | 1;
 		}
 

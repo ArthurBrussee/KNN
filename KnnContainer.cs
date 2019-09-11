@@ -69,7 +69,13 @@ namespace KNN {
 			public static KnnQueryTemp Create(int k) {
 				KnnQueryTemp temp;
 				temp.Heap = new KSmallestHeap(k, Allocator.Temp);
-				temp.MinHeap = new MinHeap(k * 4, Allocator.Temp);
+				
+				// Min heap keeps track of current stack.
+				// The max stack depth is the tree depth
+				// The tree depth is log_c(nodes)
+				// Let's assume people have a tree at most 32 deep (which equals 2^32 * c_maxPointsPerLeafNode ~ 2^39 nodes)
+				// There are left/right nodes -> 64 max on stack at any given time
+				temp.MinHeap = new MinHeap(64, Allocator.Temp);
 				return temp;
 			}
 		}
