@@ -29,6 +29,15 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnsafeUtilityEx = Unity.Collections.LowLevel.Unsafe.UnsafeUtilityEx;
+
+namespace KNN.Internal {
+	public static unsafe class UnsafeUtilityEx {
+		public static T* AllocArray<T>(int length, Allocator allocator) where T : unmanaged {
+			return (T*)UnsafeUtility.Malloc(length * UnsafeUtility.SizeOf<T>(), UnsafeUtility.AlignOf<T>(), allocator);
+		}
+	}
+}
 
 namespace KNN {
 	[NativeContainerSupportsDeallocateOnJobCompletion, NativeContainer, System.Diagnostics.DebuggerDisplay("Length = {Points.Length}")]
@@ -60,7 +69,7 @@ namespace KNN {
 		internal DisposeSentinel m_DisposeSentinel;
 #endif
 
-		const int c_maxPointsPerLeafNode = 128;
+		const int c_maxPointsPerLeafNode = 64;
 
 		public struct KnnQueryTemp {
 			public KSmallestHeap Heap;

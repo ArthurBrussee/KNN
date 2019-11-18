@@ -28,25 +28,31 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace KNN.Internal {
 	// array start at index 1
-	public struct KSmallestHeap : IDisposable {
+	public unsafe struct KSmallestHeap : IDisposable {
 		[NativeDisableContainerSafetyRestriction]
-		NativeArray<int> objs; //objects
+		int* objs; //objects
 		
 		[NativeDisableContainerSafetyRestriction]
-		NativeArray<float> heap;
+		float* heap;
 
 		public int Count;
 		int maxSize;
 
 		public float HeadValue => heap[1];
+
+		Allocator m_allocator;
 		
 		public KSmallestHeap(int maxEntries, Allocator allocator) {
 			maxSize = maxEntries;
-			heap = new NativeArray<float>(maxEntries + 1, allocator);
-			objs = new NativeArray<int>(maxEntries + 1, allocator);
+			m_allocator = allocator;
+
+			heap = UnsafeUtilityEx.AllocArray<float>(maxEntries + 1, allocator);
+			objs = UnsafeUtilityEx.AllocArray<int>(maxEntries + 1, allocator);
+			m_allocator = allocator;
+			
 			Count = 0;
 		}
-		
+			
 		public void Clear() {
 			Count = 0;
 		}
@@ -159,8 +165,8 @@ namespace KNN.Internal {
 		}
 
 		public void Dispose() {
-			heap.Dispose();
-			objs.Dispose();
+			UnsafeUtility.Free(heap, m_allocator);
+			UnsafeUtility.Free(objs, m_allocator);
 		}
 	}
 }
