@@ -16,7 +16,7 @@ This shows an approximately ~130x speedup over the original implementation! Note
 
 # API Overview
 
-```C#
+```C#	
 // First let's create a random point cloud
 var points = new NativeArray<float3>(100000, Allocator.Persistent);
 var rand = new Random(123456);
@@ -28,8 +28,14 @@ for (int i = 0; i < points.Length; ++i) {
 const int kNeighbours = 10;
 float3 queryPosition = float3.zero;
 
-// Create a container that accelerates querying for neighbours
-var knnContainer = new KnnContainer(points, true, Allocator.TempJob);
+// Create a container that accelerates querying for neighbours.
+// The 2nd argument indicates whether we want to build the tree straight away or not
+// Let's hold off on building it a little bit
+var knnContainer = new KnnContainer(points, false, Allocator.TempJob);
+
+// Whenever your point cloud changes, you can make a job to rebuild the container:
+var rebuildJob = new KnnRebuildJob(knnContainer);
+rebuildJob.Schedule().Complete();
 
 // Most basic usage:
 // Get 10 nearest neighbours as indices into our points array!
@@ -40,13 +46,13 @@ knnContainer.KNearest(queryPosition, result);
 // The result array at this point contains indices into the points array with the nearest neighbours!
 
 // Get a job to do the query.
-var queryJob = new KnnQueryJob(knnContainer, queryPosition, result);
+var queryJob = new KNearestQueryJob(knnContainer, queryPosition, result);
 
-// And just run immediatly on the main thread for now. This uses Burst!
+// And just run immediately on the main thread for now. This uses Burst!
 queryJob.Schedule().Complete();
 
 // Or maybe we want to query neighbours for multiple points.
-const int queryPoints = 1024;
+const int queryPoints = 100000;
 
 // Keep an array of neighbour indices of all points
 var results = new NativeArray<int>(queryPoints * kNeighbours, Allocator.TempJob);
@@ -60,8 +66,8 @@ for (int i = 0; i < queryPoints; ++i) {
 // Fire up job to get results for all points
 var batchQueryJob = new KNearestBatchQueryJob(knnContainer, queryPositions, results);
 
-// And just run immediatly now. This will run on multiple threads!
-batchQueryJob.ScheduleBatch(queryPositions.Length, 128).Complete();
+// And just run immediately now. This will run on multiple threads!
+batchQueryJob.ScheduleBatch(queryPositions.Length, queryPositions.Length / 32).Complete();
 
 // Now the results array contains all the neighbours!
 knnContainer.Dispose();
