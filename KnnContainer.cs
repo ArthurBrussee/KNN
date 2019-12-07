@@ -542,11 +542,9 @@ namespace KNN {
 					}
 				}
 			}
-
-			int retCount = result.Length + 1;
 			
-			for (int i = 1; i < retCount; i++) {
-				result[i - 1] = temp.Heap.PopObj();
+			for (int i = 0; i < result.Length; i++) {
+				result[i] = temp.Heap.PopObj();
 			}
 		}
 	}
