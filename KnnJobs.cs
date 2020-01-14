@@ -81,6 +81,11 @@ namespace KNN.Jobs {
 		}
 	}
 	
+	public struct RangeQueryResult {
+		NativeList<int> Indices;
+	}
+	
+	
 	[BurstCompile(CompileSynchronously = true)]
 	public struct QueryRangeBatchJob : IJobParallelForBatch {
 		[ReadOnly] KnnContainer m_container;
@@ -92,16 +97,13 @@ namespace KNN.Jobs {
 
 		float m_range;
 
-		public struct QueryResult {
-			NativeList<int> Indices;
-		}
+		public NativeArray<RangeQueryResult> Results;
 
-		public NativeArray<QueryResult> Results;
-
-		public QueryRangeBatchJob(KnnContainer container, NativeArray<float3> queryPositions, float range) {
+		public QueryRangeBatchJob(KnnContainer container, NativeArray<float3> queryPositions, float range, NativeArray<RangeQueryResult> results) {
 			m_container = container;
 			m_queryPositions = queryPositions;
 			m_range = range;
+			Results = results;
 		}
 
 		public void Execute(int startIndex, int count) {

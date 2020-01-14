@@ -34,9 +34,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 
 	KnnContainer m_container;
 	
-	NativeList<int> m_rangeResults;
-	NativeArray<int> m_rangeCumResults;
-
+	NativeArray<RangeQueryResult> m_rangeResults;
 
 	void Start() {
 		m_system = GetComponent<ParticleSystem>();
@@ -86,12 +84,13 @@ public class KnnVisualizationDemo : MonoBehaviour {
 	}
 
 	struct ParticleRangeJob : IParticleSystemJob {
-		[ReadOnly] public NativeArray<NativeList<int>> KnnResults;
+		// [ReadOnly] public NativeArray<NativeList<int>> KnnResults;
 
 		public NativeArray<float3> Points;
 		public NativeArray<Color32> Colors;
 
 		public void ProcessParticleSystem(ParticleSystemJobData jobData) {
+			/*
 			var colors = jobData.startColors;
 			var positions = jobData.positions;
 
@@ -112,7 +111,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 				for (int j = 0; j < results.Length; ++j) {
 					colors[results[j]] = setColor;
 				}
-			}
+			}*/
 		}
 	}
 
@@ -131,7 +130,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		else {
 			// Update particles job to do the colors
 			m_system.SetJob(new ParticleRangeJob {
-				KnnResults = m_rangeResults,
+				// KnnResults = m_rangeResults,
 				Points = m_points,
 				Colors = m_queryColors
 			});
@@ -156,11 +155,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 			m_results = new NativeArray<int>(QueryK * QueryProbe.All.Count, Allocator.Persistent);
 			m_queryColors = new NativeArray<Color32>(QueryProbe.All.Count, Allocator.Persistent);
 			
-			m_rangeResults = new NativeArray<NativeList<int>>(QueryProbe.All.Count, Allocator.Persistent);
-
-			for (int i = 0; i < QueryProbe.All.Count; ++i) {
-				m_rangeResults[i] = new NativeList<int>(Allocator.Persistent);
-			}
+			m_rangeResults = new NativeArray<RangeQueryResult>(QueryProbe.All.Count, Allocator.Persistent);
 		}
 		
 		for (int i = 0; i < QueryProbe.All.Count; i++) {
@@ -178,16 +173,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 			query.ScheduleBatch(m_queryPositions.Length, 1, rebuildHandle).Complete();
 		}
 		else {
-			// Clear previous results
-			for (int i = 0; i < QueryProbe.All.Count; ++i) {
-				m_rangeResults[i].Clear();
-			}
-
-			// Now do the KNN query
 			var query = new QueryRangeBatchJob(m_container, m_queryPositions, 1.0f, m_rangeResults);
-
-			// Schedule query, dependent on the rebuild
-			// We're only doing a very limited number of points - so allow each query to have it's own job
 			query.ScheduleBatch(m_queryPositions.Length, 1, rebuildHandle).Complete();
 		}
 	}
