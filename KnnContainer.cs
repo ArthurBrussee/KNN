@@ -29,7 +29,6 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnsafeUtilityEx = Unity.Collections.LowLevel.Unsafe.UnsafeUtilityEx;
 
 namespace KNN.Internal {
 	public static unsafe class UnsafeUtilityEx {
@@ -71,21 +70,36 @@ namespace KNN {
 
 		const int c_maxPointsPerLeafNode = 64;
 
-		public struct KnnQueryTemp {
-			public KSmallestHeap Heap;
-			public MinHeap MinHeap;
+		public struct KnnQueryTemp : IDisposable {
+			public MinMaxHeap<int> MaxHeap;
+			public MinMaxHeap<QueryNode> MinHeap;
 
-			public static KnnQueryTemp Create(int k) {
+			public static KnnQueryTemp Create(int kCapacity) {
 				KnnQueryTemp temp;
-				temp.Heap = new KSmallestHeap(k, Allocator.Temp);
+				temp.MaxHeap = new MinMaxHeap<int>(kCapacity, Allocator.Temp);
 				
 				// Min heap keeps track of current stack.
 				// The max stack depth is the tree depth
 				// The tree depth is log_c(nodes)
 				// Let's assume people have a tree at most 32 deep (which equals 2^32 * c_maxPointsPerLeafNode ~ 2^39 nodes)
 				// There are left/right nodes -> 64 max on stack at any given time
-				temp.MinHeap = new MinHeap(64, Allocator.Temp);
+				temp.MinHeap = new MinMaxHeap<QueryNode>(64, Allocator.Temp);
 				return temp;
+			}
+
+			public void PushQueryNode(int index, float3 closestPoint, float3 queryPosition) {
+				float lengthsq = math.lengthsq(closestPoint - queryPosition);
+				
+				MinHeap.PushObjMin(new QueryNode {
+					NodeIndex = index,
+					TempClosestPoint = closestPoint,
+					Distance = lengthsq
+				}, lengthsq);
+			}
+
+			public void Dispose() {
+				MaxHeap.Dispose();
+				MinHeap.Dispose();
 			}
 		}
 
@@ -452,50 +466,29 @@ namespace KNN {
 			}
 		}
 		
-		void PushToHeap(int nodeIndex, float3 tempClosestPoint, float3 queryPosition, ref KnnQueryTemp temp) {
-			float sqrDist = math.lengthsq(tempClosestPoint - queryPosition);
-			
-			KdQueryNode queryNode = new KdQueryNode {
-				NodeIndex = nodeIndex,
-				TempClosestPoint = tempClosestPoint,
-				Distance = sqrDist
-			};
-
-			temp.MinHeap.PushObj(queryNode, sqrDist);
-		}
-
-		public void KNearest(float3 queryPosition, NativeSlice<int> result) {
+		public void QueryRange(float3 queryPosition, float radius, NativeList<int> result) {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
 			AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-			var temp = KnnQueryTemp.Create(result.Length);
-			KNearest(queryPosition, result, ref temp);
-		}
-		
-		internal unsafe void KNearest(float3 queryPosition, NativeSlice<int> result, ref KnnQueryTemp temp) {
-			int k = result.Length;
-			temp.Heap.Clear();
-			
-			var points = Points;
-			var permutation = m_permutation;
-			var rootNode = RootNode;
-			var nodePtr = m_nodes.GetUnsafePtr();
+
+			// Start with a temp that's probably big enough. Resized dynamically
+			var temp = KnnQueryTemp.Create(16);
 			
 			// Biggest Smallest Squared Radius
-			float bssr = float.PositiveInfinity;
-			float3 rootClosestPoint = rootNode.Bounds.ClosestPoint(queryPosition);
+			float bssr = radius * radius;
+			float3 rootClosestPoint = RootNode.Bounds.ClosestPoint(queryPosition);
 			
-			PushToHeap(m_rootNodeIndex[0], rootClosestPoint, queryPosition, ref temp);
+			temp.PushQueryNode(m_rootNodeIndex[0], rootClosestPoint, queryPosition);
 			
 			// searching
 			while (temp.MinHeap.Count > 0) {
-				KdQueryNode queryNode = temp.MinHeap.PopObj();
+				QueryNode queryNode = temp.MinHeap.PopObjMin();
 
 				if (queryNode.Distance > bssr) {
 					continue;
 				}
 
-				ref KdNode node = ref UnsafeUtilityEx.ArrayElementAsRef<KdNode>(nodePtr, queryNode.NodeIndex);
+				KdNode node = m_nodes[queryNode.NodeIndex];
 
 				if (!node.Leaf) {
 					int partitionAxis = node.PartitionAxis;
@@ -506,46 +499,129 @@ namespace KNN {
 						// we already know we are on the side of negative bound/node,
 						// so we don't need to test for distance
 						// push to stack for later querying
-						PushToHeap(node.NegativeChildIndex, tempClosestPoint, queryPosition, ref temp);
+						temp.PushQueryNode(node.NegativeChildIndex, tempClosestPoint, queryPosition);
 
 						// project the tempClosestPoint to other bound
 						tempClosestPoint[partitionAxis] = partitionCoord;
 
 						if (node.Count != 0) {
-							PushToHeap(node.PositiveChildIndex, tempClosestPoint, queryPosition, ref temp);
+							temp.PushQueryNode(node.PositiveChildIndex, tempClosestPoint, queryPosition);
+						}
+					}
+					else {
+						// we already know we are on the side of positive bound/node,
+						// so we don't need to test for distance
+						// push to stack for later querying
+						temp.PushQueryNode(node.PositiveChildIndex, tempClosestPoint, queryPosition);
+
+						// project the tempClosestPoint to other bound
+						tempClosestPoint[partitionAxis] = partitionCoord;
+
+						if (node.Count != 0) {
+							temp.PushQueryNode(node.NegativeChildIndex, tempClosestPoint, queryPosition);
+						}
+					}
+				} else {
+					for (int i = node.Start; i < node.End; i++) {
+						int index = m_permutation[i];
+						float sqrDist = math.lengthsq(Points[index] - queryPosition);
+
+						if (sqrDist <= bssr) {
+							// Unlike the k-query we want to keep _all_ objects in range
+							// So resize the heap when pushing this node
+							if (temp.MaxHeap.IsFull) {
+								temp.MaxHeap.Resize(temp.MaxHeap.Count * 2);
+							}
+	
+							temp.MaxHeap.PushObjMax(index, sqrDist);
+						}
+					}
+				}
+			}
+
+			while (temp.MaxHeap.Count > 0) {
+				result.Add(temp.MaxHeap.PopObjMax());
+			}
+
+			temp.Dispose();
+		}
+
+		public void QueryKNearest(float3 queryPosition, NativeSlice<int> result) {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+			AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
+#endif
+			
+			var temp = KnnQueryTemp.Create(result.Length);
+			int k = result.Length;
+			
+			
+			// Biggest Smallest Squared Radius
+			float bssr = float.PositiveInfinity;
+			float3 rootClosestPoint = RootNode.Bounds.ClosestPoint(queryPosition);
+			
+			temp.PushQueryNode(m_rootNodeIndex[0], rootClosestPoint, queryPosition);
+			
+			// searching
+			while (temp.MinHeap.Count > 0) {
+				QueryNode queryNode = temp.MinHeap.PopObjMin();
+
+				if (queryNode.Distance > bssr) {
+					continue;
+				}
+
+				KdNode node = m_nodes[queryNode.NodeIndex];
+
+				if (!node.Leaf) {
+					int partitionAxis = node.PartitionAxis;
+					float partitionCoord = node.PartitionCoordinate;
+					float3 tempClosestPoint = queryNode.TempClosestPoint;
+
+					if (tempClosestPoint[partitionAxis] - partitionCoord < 0) {
+						// we already know we are on the side of negative bound/node,
+						// so we don't need to test for distance
+						// push to stack for later querying
+						temp.PushQueryNode(node.NegativeChildIndex, tempClosestPoint, queryPosition);
+
+						// project the tempClosestPoint to other bound
+						tempClosestPoint[partitionAxis] = partitionCoord;
+
+						if (node.Count != 0) {
+							temp.PushQueryNode(node.PositiveChildIndex, tempClosestPoint, queryPosition);
 						}
 					} else {
 						// we already know we are on the side of positive bound/node,
 						// so we don't need to test for distance
 						// push to stack for later querying
-						PushToHeap(node.PositiveChildIndex, tempClosestPoint, queryPosition, ref temp);
+						temp.PushQueryNode(node.PositiveChildIndex, tempClosestPoint, queryPosition);
 
 						// project the tempClosestPoint to other bound
 						tempClosestPoint[partitionAxis] = partitionCoord;
 
 						if (node.Count != 0) {
-							PushToHeap(node.NegativeChildIndex, tempClosestPoint, queryPosition, ref temp);
+							temp.PushQueryNode(node.NegativeChildIndex, tempClosestPoint, queryPosition);
 						}
 					}
 				} else {
 					for (int i = node.Start; i < node.End; i++) {
-						int index = permutation[i];
-						float sqrDist = math.lengthsq(points[index] - queryPosition);
+						int index = m_permutation[i];
+						float sqrDist = math.lengthsq(Points[index] - queryPosition);
 
 						if (sqrDist <= bssr) {
-							temp.Heap.PushObj(index, sqrDist);
+							temp.MaxHeap.PushObjMax(index, sqrDist);
 
-							if (temp.Heap.Count == k) {
-								bssr = temp.Heap.HeadValue;
+							if (temp.MaxHeap.Count == k) {
+								bssr = temp.MaxHeap.HeadValue;
 							}
 						}
 					}
 				}
 			}
 			
-			for (int i = 0; i < result.Length; i++) {
-				result[i] = temp.Heap.PopObj();
+			for (int i = 0; i < k; i++) {
+				result[i] = temp.MaxHeap.PopObjMax();
 			}
+			
+			temp.Dispose();
 		}
 	}
 }

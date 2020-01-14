@@ -36,13 +36,13 @@ public static class KnnApiDemo  {
 		// Get 10 nearest neighbours as indices into our points array!
 		// This is NOT burst accelerated yet! Unity need to implement compiling delegates with Burst
 		var result = new NativeArray<int>(kNeighbours, Allocator.TempJob);
-		knnContainer.KNearest(queryPosition, result);
+		knnContainer.QueryKNearest(queryPosition, result);
 
 		// The result array at this point contains indices into the points array with the nearest neighbours!
 		
 		Profiler.BeginSample("Simple Query");
 		// Get a job to do the query.
-		var queryJob = new KNearestQueryJob(knnContainer, queryPosition, result);
+		var queryJob = new QueryKNearestJob(knnContainer, queryPosition, result);
 		
 		// And just run immediately on the main thread for now. This uses Burst!
 		queryJob.Schedule().Complete();
@@ -63,7 +63,7 @@ public static class KnnApiDemo  {
 
 		Profiler.BeginSample("Batch Query");
 		// Fire up job to get results for all points
-		var batchQueryJob = new KNearestBatchQueryJob(knnContainer, queryPositions, results);
+		var batchQueryJob = new QueryKNearestBatchJob(knnContainer, queryPositions, results);
 
 		// And just run immediately now. This will run on multiple threads!
 		batchQueryJob.ScheduleBatch(queryPositions.Length, queryPositions.Length / 32).Complete();
