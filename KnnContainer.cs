@@ -29,6 +29,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace KNN.Internal {
 	public static unsafe class UnsafeUtilityEx {
@@ -553,7 +554,6 @@ namespace KNN {
 			
 			var temp = KnnQueryTemp.Create(result.Length);
 			int k = result.Length;
-			
 			
 			// Biggest Smallest Squared Radius
 			float bssr = float.PositiveInfinity;

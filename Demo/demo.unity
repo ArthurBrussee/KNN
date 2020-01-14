@@ -792,8 +792,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3e542aca92515f4f9b8b51314822079, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  Mode: 1
   ParticleCount: 20000
   QueryK: 20
+  QueryRange: 0.2
 --- !u!199 &1356242403
 ParticleSystemRenderer:
   serializedVersion: 6

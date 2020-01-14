@@ -23,7 +23,6 @@ public class KnnVisualizationDemo : MonoBehaviour {
 	public int QueryK = 20;
 	public float QueryRange = 1.0f;
 	
-	
 	ParticleSystem m_system;
 
 	NativeArray<float3> m_queryPositions;
@@ -50,6 +49,10 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		m_points.Dispose();
 		m_container.Dispose();
 		m_results.Dispose();
+		foreach (var result in m_rangeResults) {
+			result.Dispose();
+		}
+
 		m_rangeResults.Dispose();
 		m_queryPositions.Dispose();
 		m_queryColors.Dispose();
@@ -84,41 +87,39 @@ public class KnnVisualizationDemo : MonoBehaviour {
 	}
 
 	struct ParticleRangeJob : IParticleSystemJob {
-		// [ReadOnly] public NativeArray<NativeList<int>> KnnResults;
+		[ReadOnly] public NativeArray<RangeQueryResult> KnnResults;
 
 		public NativeArray<float3> Points;
 		public NativeArray<Color32> Colors;
 
 		public void ProcessParticleSystem(ParticleSystemJobData jobData) {
-			/*
-			var colors = jobData.startColors;
-			var positions = jobData.positions;
+			var partColors = jobData.startColors;
+			var partPos = jobData.positions;
 
 			for (int i = 0; i < jobData.count; ++i) {
-				Points[i] = new float3(positions.x[i], positions.y[i], positions.z[i]);
+				Points[i] = new float3(partPos.x[i], partPos.y[i], partPos.z[i]);
 			}
 
 			// Set every particle to white first
 			for (int i = 0; i < jobData.count; i++) {
-				colors[i] = new Color32(0, 0, 0, 255);
+				partColors[i] = new Color32(0, 0, 0, 255);
 			}
 
 			// Set all neighbours to result color
 			for (int i = 0; i < KnnResults.Length; i++) {
 				var results = KnnResults[i];
 				var setColor = Colors[i];
-				
+
 				for (int j = 0; j < results.Length; ++j) {
-					colors[results[j]] = setColor;
+					partColors[results[j]] = setColor;
 				}
-			}*/
+			}
 		}
 	}
 
 	
 	void Update() {
 		if (Mode == QueryMode.KNearest) {
-
 			// Update particles job to do the colors
 			m_system.SetJob(new ParticleJob {
 				KnnResults = m_results,
@@ -130,7 +131,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		else {
 			// Update particles job to do the colors
 			m_system.SetJob(new ParticleRangeJob {
-				// KnnResults = m_rangeResults,
+				KnnResults = m_rangeResults,
 				Points = m_points,
 				Colors = m_queryColors
 			});
@@ -155,7 +156,13 @@ public class KnnVisualizationDemo : MonoBehaviour {
 			m_results = new NativeArray<int>(QueryK * QueryProbe.All.Count, Allocator.Persistent);
 			m_queryColors = new NativeArray<Color32>(QueryProbe.All.Count, Allocator.Persistent);
 			
+			// Initialize all the range query results
 			m_rangeResults = new NativeArray<RangeQueryResult>(QueryProbe.All.Count, Allocator.Persistent);
+
+			for (int i = 0; i < m_rangeResults.Length; ++i) {
+				// Allow for a maximum of 1024 results
+				m_rangeResults[i] = new RangeQueryResult(1024, Allocator.Persistent);
+			}
 		}
 		
 		for (int i = 0; i < QueryProbe.All.Count; i++) {
@@ -163,7 +170,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 			m_queryPositions[i] = p.transform.position;
 			m_queryColors[i] = p.Color;
 		}
-
+		
 		if (Mode == QueryMode.KNearest) {
 			// Now do the KNN query
 			var query = new QueryKNearestBatchJob(m_container, m_queryPositions, m_results);
