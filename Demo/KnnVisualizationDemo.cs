@@ -52,7 +52,6 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		foreach (var result in m_rangeResults) {
 			result.Dispose();
 		}
-
 		m_rangeResults.Dispose();
 		m_queryPositions.Dispose();
 		m_queryColors.Dispose();
@@ -116,7 +115,6 @@ public class KnnVisualizationDemo : MonoBehaviour {
 			}
 		}
 	}
-
 	
 	void Update() {
 		if (Mode == QueryMode.KNearest) {
@@ -159,6 +157,7 @@ public class KnnVisualizationDemo : MonoBehaviour {
 			// Initialize all the range query results
 			m_rangeResults = new NativeArray<RangeQueryResult>(QueryProbe.All.Count, Allocator.Persistent);
 
+			// Each range query result object needs to declare upfront what the maximum number of points in range is
 			for (int i = 0; i < m_rangeResults.Length; ++i) {
 				// Allow for a maximum of 1024 results
 				m_rangeResults[i] = new RangeQueryResult(1024, Allocator.Persistent);
@@ -171,17 +170,26 @@ public class KnnVisualizationDemo : MonoBehaviour {
 			m_queryColors[i] = p.Color;
 		}
 		
-		if (Mode == QueryMode.KNearest) {
-			// Now do the KNN query
-			var query = new QueryKNearestBatchJob(m_container, m_queryPositions, m_results);
+		switch (Mode) {
+			case QueryMode.KNearest: {
+				// Do a KNN query
+				var query = new QueryKNearestBatchJob(m_container, m_queryPositions, m_results);
 
-			// Schedule query, dependent on the rebuild
-			// We're only doing a very limited number of points - so allow each query to have it's own job
-			query.ScheduleBatch(m_queryPositions.Length, 1, rebuildHandle).Complete();
-		}
-		else {
-			var query = new QueryRangeBatchJob(m_container, m_queryPositions, 1.0f, m_rangeResults);
-			query.ScheduleBatch(m_queryPositions.Length, 1, rebuildHandle).Complete();
+				// Schedule query, dependent on the rebuild
+				// We're only doing a very limited number of points - so allow each query to have it's own job
+				query.ScheduleBatch(m_queryPositions.Length, 1, rebuildHandle).Complete();
+				break;
+			}
+
+			case QueryMode.Range: {
+				// Do a range query
+				var query = new QueryRangeBatchJob(m_container, m_queryPositions, QueryRange, m_rangeResults);
+			
+				// Schedule query, dependent on the rebuild
+				// We're only doing a very limited number of points - so allow each query to have it's own job
+				query.ScheduleBatch(m_queryPositions.Length, 1, rebuildHandle).Complete();
+				break;
+			}
 		}
 	}
 }

@@ -54,7 +54,7 @@ namespace KNN.Internal {
 		int m_capacity;
 
 		public float HeadValue => values[1];
-		public T HeadKey => keys[1];
+		T HeadKey => keys[1];
 
 		public bool IsFull => Count == m_capacity;
 
@@ -70,12 +70,6 @@ namespace KNN.Internal {
 			keys = UnsafeUtilityEx.AllocArray<T>(startCapacity + 1, m_allocator);
 		}
 		
-		public void Free() {
-			UnsafeUtility.Free(values, m_allocator);
-			UnsafeUtility.Free(keys, m_allocator);
-		}
-
-		
 		void Swap(int indexA, int indexB) {
 			float tempVal = values[indexA];
 			values[indexA] = values[indexB];
@@ -87,7 +81,10 @@ namespace KNN.Internal {
 		}
 		
 		public void Dispose() {
-			Free();
+			UnsafeUtility.Free(values, m_allocator);
+			UnsafeUtility.Free(keys, m_allocator);
+			values = null;
+			keys = null;
 		}
 
 		public void Resize(int newSize) {
@@ -100,7 +97,7 @@ namespace KNN.Internal {
 			UnsafeUtility.MemCpy(newKeys, keys, (m_capacity + 1) * sizeof(int));
 			
 			// Get rid of old arrays
-			Free();
+			Dispose();
 
 			// And now use old arrays
 			values = newValues;
@@ -209,9 +206,7 @@ namespace KNN.Internal {
 			// if heap full
 			if (Count == m_capacity) {
 				// if Heads priority is smaller than input priority, then ignore that item
-				if (HeadValue < val) {
-				}
-				else {
+				if (HeadValue > val) {
 					values[1] = val; // remove top element
 					keys[1] = key;
 					BubbleDownMax(1); // bubble it down
@@ -229,9 +224,7 @@ namespace KNN.Internal {
 			// if heap full
 			if (Count == m_capacity) {
 				// if Heads priority is smaller than input priority, then ignore that item
-				if (HeadValue > val) {
-				}
-				else {
+				if (HeadValue < val) {
 					values[1] = val; // remove top element
 					keys[1] = key;
 					BubbleDownMin(1); // bubble it down

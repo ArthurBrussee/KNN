@@ -26,7 +26,7 @@ namespace KNN.Jobs {
 			m_container.QueryKNearest(m_queryPosition, m_result);
 		}
 	}
-	
+
 	[BurstCompile(CompileSynchronously = true)]
 	public struct QueryRangeJob : IJob {
 		[ReadOnly] KnnContainer m_container;
@@ -65,11 +65,11 @@ namespace KNN.Jobs {
 			m_queryPositions = queryPositions;
 			m_results = results;
 
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
+		#if ENABLE_UNITY_COLLECTIONS_CHECKS
 			if (queryPositions.Length == 0 || results.Length % queryPositions.Length != 0) {
 				Debug.LogError("Make sure your results array is a multiple in length of your querypositions array!");
 			}
-#endif
+		#endif
 
 			m_k = results.Length / queryPositions.Length;
 		}
@@ -82,15 +82,14 @@ namespace KNN.Jobs {
 			}
 		}
 	}
-	
+
 	public unsafe struct RangeQueryResult {
 		public int Length;
 
 		int* m_indices;
 		int m_capacity;
-		
-		Allocator m_allocator;
 
+		Allocator m_allocator;
 
 		public int this[int index] {
 			get {
@@ -118,8 +117,8 @@ namespace KNN.Jobs {
 			UnsafeUtility.Free(m_indices, m_allocator);
 		}
 	}
-	
-	
+
+
 	[BurstCompile(CompileSynchronously = true)]
 	public struct QueryRangeBatchJob : IJobParallelForBatch {
 		[ReadOnly] KnnContainer m_container;
@@ -144,7 +143,7 @@ namespace KNN.Jobs {
 
 				var result = Results[index];
 				result.SetResults(tempList);
-				
+
 				Results[index] = result;
 			}
 		}

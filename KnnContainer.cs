@@ -29,7 +29,6 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEngine;
 
 namespace KNN.Internal {
 	public static unsafe class UnsafeUtilityEx {
@@ -371,12 +370,6 @@ namespace KNN {
 		/// 3b. If they are not, then points are only on left or right bound.
 		/// 4. Move the splitting pivot so that it shrinks part with points completely (calculate min or max dependent) and return.
 		/// </summary>
-		/// <param name="start"></param>
-		/// <param name="end"></param>
-		/// <param name="boundsStart"></param>
-		/// <param name="boundsEnd"></param>
-		/// <param name="axis"></param>
-		/// <returns></returns>
 		float CalculatePivot(int start, int end, float boundsStart, float boundsEnd, int axis) {
 			//! sliding midpoint rule
 			float midPoint = (boundsStart + boundsEnd) / 2.0f;
@@ -472,8 +465,8 @@ namespace KNN {
 			AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
 
-			// Start with a temp that's probably big enough. Resized dynamically
-			var temp = KnnQueryTemp.Create(16);
+			// Start with a temp of some size. This will be resized dynamically
+			var temp = KnnQueryTemp.Create(32);
 			
 			// Biggest Smallest Squared Radius
 			float bssr = radius * radius;
@@ -481,7 +474,6 @@ namespace KNN {
 			
 			temp.PushQueryNode(m_rootNodeIndex[0], rootClosestPoint, queryPosition);
 			
-			// searching
 			while (temp.MinHeap.Count > 0) {
 				QueryNode queryNode = temp.MinHeap.PopObjMin();
 
@@ -561,7 +553,6 @@ namespace KNN {
 			
 			temp.PushQueryNode(m_rootNodeIndex[0], rootClosestPoint, queryPosition);
 			
-			// searching
 			while (temp.MinHeap.Count > 0) {
 				QueryNode queryNode = temp.MinHeap.PopObjMin();
 

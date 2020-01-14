@@ -41,15 +41,16 @@ rebuildJob.Schedule().Complete();
 // Get 10 nearest neighbours as indices into our points array!
 // This is NOT burst accelerated yet! Unity need to implement compiling delegates with Burst
 var result = new NativeArray<int>(kNeighbours, Allocator.TempJob);
-knnContainer.KNearest(queryPosition, result);
+knnContainer.QueryKNearest(queryPosition, result);
 
 // The result array at this point contains indices into the points array with the nearest neighbours!
-
+Profiler.BeginSample("Simple Query");
 // Get a job to do the query.
-var queryJob = new KNearestQueryJob(knnContainer, queryPosition, result);
+var queryJob = new QueryKNearestJob(knnContainer, queryPosition, result);
 
 // And just run immediately on the main thread for now. This uses Burst!
 queryJob.Schedule().Complete();
+Profiler.EndSample();
 
 // Or maybe we want to query neighbours for multiple points.
 const int queryPoints = 100000;
@@ -64,19 +65,45 @@ for (int i = 0; i < queryPoints; ++i) {
 }	
 
 // Fire up job to get results for all points
-var batchQueryJob = new KNearestBatchQueryJob(knnContainer, queryPositions, results);
+var batchQueryJob = new QueryKNearestBatchJob(knnContainer, queryPositions, results);
 
 // And just run immediately now. This will run on multiple threads!
 batchQueryJob.ScheduleBatch(queryPositions.Length, queryPositions.Length / 32).Complete();
 
+// Or maybe we're interested in a range around eacht query point
+var queryRangeResult = new NativeList<int>(Allocator.TempJob);
+var rangeQueryJob = new QueryRangeJob(knnContainer, queryPosition, 2.0f, queryRangeResult);
+
+// Store a list of particles in range
+var rangeResults = new NativeArray<RangeQueryResult>(queryPoints, Allocator.TempJob);
+
+// And just run immediately on the main thread for now. This uses Burst!
+rangeQueryJob.Schedule().Complete();
+
+// Unfortunately, for batch range queries we do need to decide upfront the maximum nr. of neighbours we allow
+// This is due to limitation on allocations within a job.
+for (int i = 0; i < rangeResults.Length; ++i) {
+    rangeResults[i] = new RangeQueryResult(128, Allocator.TempJob);
+}
+
+// Fire up job to get results for all points
+var batchRange = new QueryRangeBatchJob(knnContainer, queryPositions, 2.0f, rangeResults);
+
+// And just run immediately now. This will run on multiple threads!
+batchRange.ScheduleBatch(queryPositions.Length, queryPositions.Length / 32).Complete();
+
 // Now the results array contains all the neighbours!
+queryRangeResult.Dispose();
+foreach (var r in rangeResults) {
+    r.Dispose();
+}
+rangeResults.Dispose();
 knnContainer.Dispose();
 queryPositions.Dispose();
 results.Dispose();
 points.Dispose();
 result.Dispose();
 ```
-
 
 # Demo
 
