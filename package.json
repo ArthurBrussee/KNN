@@ -11,7 +11,7 @@
   "category": "Unity",
   "dependencies": {
     "com.unity.burst": "1.1.2",
-    "com.unity.collections": "0.1.1-preview",
+    "com.unity.collections": "0.17.0-preview.18",
     "com.unity.mathematics": "1.1.0",
     "com.unity.jobs": "0.1.1-preview"
   }
