@@ -4,7 +4,10 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Experimental.ParticleSystemJobs;
+//using UnityEngine.Experimental.ParticleSystemJobs;
+//using UnityEngine.Experimental;
+
+using UnityEngine.ParticleSystemJobs;
 
 // Ideally you really would use something like ECS to visualize the point cloud
 // And query from a job component system
@@ -57,16 +60,22 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		m_queryColors.Dispose();
 	}
 
-	// [BurstCompile(CompileSynchronously = true)]
-	struct ParticleJob : IParticleSystemJob {
-		[ReadOnly] public NativeArray<int> KnnResults;
+    // [BurstCompile(CompileSynchronously = true)]
+    //	struct ParticleJob : IParticleSystemJob {
+    struct ParticleJob : IJobParticleSystem
+    {
+
+        [ReadOnly] public NativeArray<int> KnnResults;
 		public NativeArray<float3> Points;
 
 		public NativeArray<Color32> Colors;
 		public int K;
 
-		public void ProcessParticleSystem(ParticleSystemJobData jobData) {
-			var colors = jobData.startColors;
+        //	public void ProcessParticleSystem(ParticleSystemJobData jobData) {
+        public void Execute(ParticleSystemJobData jobData)
+        {
+
+            var colors = jobData.startColors;
 			var positions = jobData.positions;
 
 			for (int i = 0; i < jobData.count; ++i) {
@@ -85,14 +94,20 @@ public class KnnVisualizationDemo : MonoBehaviour {
 		}
 	}
 
-	struct ParticleRangeJob : IParticleSystemJob {
-		[ReadOnly] public NativeArray<RangeQueryResult> KnnResults;
+    //	struct ParticleRangeJob : IParticleSystemJob {
+    struct ParticleRangeJob : IJobParticleSystem
+    {
+
+        [ReadOnly] public NativeArray<RangeQueryResult> KnnResults;
 
 		public NativeArray<float3> Points;
 		public NativeArray<Color32> Colors;
 
-		public void ProcessParticleSystem(ParticleSystemJobData jobData) {
-			var partColors = jobData.startColors;
+        //		public void ProcessParticleSystem(ParticleSystemJobData jobData) {
+        public void Execute(ParticleSystemJobData jobData)
+        {
+
+            var partColors = jobData.startColors;
 			var partPos = jobData.positions;
 
 			for (int i = 0; i < jobData.count; ++i) {
