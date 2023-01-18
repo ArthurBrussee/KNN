@@ -48,7 +48,7 @@ namespace KNN.Jobs {
 	}
 
 
-	[BurstCompile(CompileSynchronously = true)]
+	//[BurstCompile(CompileSynchronously = true)]
 	public struct QueryKNearestBatchJob : IJobParallelForBatch {
 		[ReadOnly] KnnContainer m_container;
 		[ReadOnly] NativeSlice<float3> m_queryPositions;
@@ -119,7 +119,7 @@ namespace KNN.Jobs {
 	}
 
 
-	[BurstCompile(CompileSynchronously = true)]
+	//[BurstCompile(CompileSynchronously = true)]
 	public struct QueryRangeBatchJob : IJobParallelForBatch {
 		[ReadOnly] KnnContainer m_container;
 		[ReadOnly] NativeSlice<float3> m_queryPositions;
@@ -149,7 +149,7 @@ namespace KNN.Jobs {
 		}
 	}
 
-	[BurstCompile(CompileSynchronously = true)]
+	//[BurstCompile(CompileSynchronously = true)]
 	public struct KnnRebuildJob : IJob {
 		KnnContainer m_container;
 
